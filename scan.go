@@ -1232,35 +1232,63 @@ func typeToInt(token string) (uint16, bool) {
 
 // stringToTTL parses things like 2w, 2m, etc, and returns the time in seconds.
 func stringToTTL(token string) (uint32, bool) {
-	var s, i uint
+	// Accumulate in uint64. A uint multiply wraps, and a wrapped value can
+	// land at or below MaxUint32 and be accepted. 2^64+5 became 5 seconds.
+	var s, i uint64
+	add := func(n uint64) bool {
+		if s > math.MaxUint64-n {
+			return false
+		}
+		s += n
+		return true
+	}
 	for _, c := range token {
 		switch c {
 		case 's', 'S':
-			s += i
+			if !add(i) {
+				return 0, false
+			}
 			i = 0
 		case 'm', 'M':
-			s += i * 60
+			if i > math.MaxUint64/60 || !add(i*60) {
+				return 0, false
+			}
 			i = 0
 		case 'h', 'H':
-			s += i * 60 * 60
+			if i > math.MaxUint64/3600 || !add(i*3600) {
+				return 0, false
+			}
 			i = 0
 		case 'd', 'D':
-			s += i * 60 * 60 * 24
+			const day = 60 * 60 * 24
+			if i > math.MaxUint64/day || !add(i*day) {
+				return 0, false
+			}
 			i = 0
 		case 'w', 'W':
-			s += i * 60 * 60 * 24 * 7
+			const week = 60 * 60 * 24 * 7
+			if i > math.MaxUint64/week || !add(i*week) {
+				return 0, false
+			}
 			i = 0
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			if i > math.MaxUint64/10 {
+				return 0, false
+			}
 			i *= 10
-			i += uint(c) - '0'
+			digit := uint64(c - '0')
+			if i > math.MaxUint64-digit {
+				return 0, false
+			}
+			i += digit
 		default:
 			return 0, false
 		}
 	}
-	if s+i > math.MaxUint32 {
+	if !add(i) || s > math.MaxUint32 {
 		return 0, false
 	}
-	return uint32(s + i), true
+	return uint32(s), true
 }
 
 // Parse LOC records' <digits>[.<digits>][mM] into a

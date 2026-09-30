@@ -11,6 +11,25 @@ import (
 	"testing/fstest"
 )
 
+func TestStringToTTLOverflow(t *testing.T) {
+	// 2^64+5 wraps the digit accumulator to 5 and was accepted.
+	if ttl, ok := stringToTTL("18446744073709551621"); ok {
+		t.Fatalf("overflow TTL parsed as %d", ttl)
+	}
+	if ttl, ok := stringToTTL("1w"); !ok || ttl != 604800 {
+		t.Fatalf("1w: %d ok=%v", ttl, ok)
+	}
+	if ttl, ok := stringToTTL("2w1d"); !ok || ttl != 1296000 {
+		t.Fatalf("2w1d: %d ok=%v", ttl, ok)
+	}
+	if ttl, ok := stringToTTL("4294967295"); !ok || ttl != 4294967295 {
+		t.Fatalf("max: %d ok=%v", ttl, ok)
+	}
+	if _, ok := stringToTTL("4294967296"); ok {
+		t.Fatal("2^32 seconds was accepted")
+	}
+}
+
 func TestZoneParserGenerate(t *testing.T) {
 	zone := "$ORIGIN example.org.\n$GENERATE 10-12 foo${2,3,d} IN A 127.0.0.$"
 
