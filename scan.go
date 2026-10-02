@@ -1402,11 +1402,10 @@ func slurpRemainder(c *zlexer) *ParseError {
 // Parse a 64 bit-like ipv6 address: "0014:4fff:ff20:ee64"
 // Used for NID and L64 record.
 func stringToNodeID(l lex) (uint64, *ParseError) {
-	if len(l.token) < 19 {
-		return 0, &ParseError{file: l.token, err: "bad NID/L64 NodeID/Locator64", lex: l}
-	}
-	// There must be three colons at fixes positions, if not its a parse error
-	if l.token[4] != ':' && l.token[9] != ':' && l.token[14] != ':' {
+	// Presentation is exactly xxxx:xxxx:xxxx:xxxx. A missing colon was
+	// skipped, and characters past the 19th were ignored.
+	// 0014X4fff:ff20:ee64 parsed as 0014:4fff:ff20:ee64.
+	if len(l.token) != 19 || l.token[4] != ':' || l.token[9] != ':' || l.token[14] != ':' {
 		return 0, &ParseError{file: l.token, err: "bad NID/L64 NodeID/Locator64", lex: l}
 	}
 	s := l.token[0:4] + l.token[5:9] + l.token[10:14] + l.token[15:19]

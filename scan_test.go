@@ -483,3 +483,37 @@ func TestEscapedStringOffset(t *testing.T) {
 		}
 	}
 }
+
+func TestParseNodeID(t *testing.T) {
+	rr, err := NewRR("host.example.com. 3600 IN NID 10 0014:4fff:ff20:ee64")
+	if err != nil {
+		t.Fatalf("expected no error, but got %s", err)
+	}
+	nid, ok := rr.(*NID)
+	if !ok {
+		t.Fatalf("expected *NID, but got %T", rr)
+	}
+	if nid.NodeID != 0x00144fffff20ee64 {
+		t.Fatalf("NodeID = %x", nid.NodeID)
+	}
+	l64, err := NewRR("host.example.com. 3600 IN L64 10 2001:0DB8:1140:1000")
+	if err != nil {
+		t.Fatalf("expected no error, but got %s", err)
+	}
+	if _, ok := l64.(*L64); !ok {
+		t.Fatalf("expected *L64, but got %T", l64)
+	}
+
+	// A missing colon was skipped. Extra characters were ignored.
+	records := []string{
+		"host.example.com. 3600 IN NID 10 0014X4fff:ff20:ee64",
+		"host.example.com. 3600 IN NID 10 0014:4fff:ff20:ee64ABCD",
+		"host.example.com. 3600 IN L64 10 2001X0DB8:1140:1000",
+	}
+	for _, record := range records {
+		const expect = "bad NID/L64"
+		if got, err := NewRR(record); err == nil || !strings.Contains(err.Error(), expect) {
+			t.Errorf("NewRR(%v) = %v, want err to contain %q", record, got, expect)
+		}
+	}
+}
